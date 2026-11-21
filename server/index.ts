@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import express from 'express'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { loadConfig, type TranslatorConfig } from './config.js'
+import { loadConfig, type VocabConfig } from './config.js'
 import {
   addMessage,
   createSession,
@@ -26,7 +26,7 @@ const projectRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const distDir = path.join(projectRoot, 'dist')
 
 const loaded = await loadConfig()
-const config: TranslatorConfig = loaded.config
+const config: VocabConfig = loaded.config
 openDatabase(config)
 
 const app = express()
@@ -377,7 +377,7 @@ app.use((req, res) => {
     .status(503)
     .type('html')
     .send(
-      '<!doctype html><meta charset="utf-8"><title>translator</title>' +
+      '<!doctype html><meta charset="utf-8"><title>vocab</title>' +
         '<body style="background:#000;color:#ddd;font:16px system-ui;padding:2rem">' +
         '<p>No build yet. Run <code>npm run build</code> (or <code>npm run dev</code> for the dev server).</p>',
     )
@@ -387,7 +387,7 @@ const server = app.listen(config.server.port, config.server.host, () => {
   const address = `${config.server.host}:${config.server.port}`
   const lines = [
     '',
-    '  translator is running',
+    '  vocab is running',
     `  api      http://${address}`,
     `  model    ${config.openrouter.model}`,
     `  hotkey   ${config.hotkey}`,

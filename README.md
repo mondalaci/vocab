@@ -1,4 +1,4 @@
-# translator
+# vocab
 
 A bilingual English↔Hungarian dictionary that lives in a desktop overlay you summon with a hotkey.
 
@@ -50,8 +50,8 @@ game is using.
 ## Quick start
 
 ```bash
-git clone https://github.com/mondalaci/translator.git
-cd translator
+git clone https://github.com/mondalaci/vocab.git
+cd vocab
 npm install
 cp config.example.mjs config.mjs    # then put your key in it
 npm run build
@@ -65,12 +65,12 @@ Two processes, both in `ecosystem.config.cjs`:
 
 | pm2 app | what it is |
 | --- | --- |
-| `translator` | the API on `127.0.0.1:8787` |
-| `translator-overlay` | the window, and the hotkey |
+| `vocab` | the API on `127.0.0.1:8787` |
+| `vocab-overlay` | the window, and the hotkey |
 
 ```bash
-pm2 restart translator translator-overlay   # after a config change or a rebuild
-pm2 logs translator-overlay                 # shows the hotkey it grabbed, and any load failure
+pm2 restart vocab vocab-overlay   # after a config change or a rebuild
+pm2 logs vocab-overlay            # shows the hotkey it grabbed, and any load failure
 ```
 
 ## Using the overlay
@@ -118,7 +118,7 @@ values work. Missing keys fall back to `config.example.mjs`.
 | `chat.extraInstructions` | `""` | Appended to the system prompt — the easy way to tune the style. |
 
 Env overrides: `PORT`, `HOST`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_BASE_URL`,
-`TRANSLATOR_HOTKEY`, `TRANSLATOR_DB`, `TRANSLATOR_CONFIG`, `TRANSLATOR_OVERLAY_URL`.
+`VOCAB_HOTKEY`, `VOCAB_DB`, `VOCAB_CONFIG`, `VOCAB_OVERLAY_URL`.
 
 ## Development
 
@@ -145,8 +145,8 @@ server/images.ts       Wikipedia lead image, cached
 
 | Symptom | Fix |
 | --- | --- |
-| The hotkey does nothing | Another app already owns it — `pm2 logs translator-overlay` says so. Change `hotkey` in `config.mjs` and restart. |
-| The overlay shows a connection error | The API is not up: `pm2 restart translator`. The window retries every 1.5 s. |
+| The hotkey does nothing | Another app already owns it — `pm2 logs vocab-overlay` says so. Change `hotkey` in `config.mjs` and restart. |
+| The overlay shows a connection error | The API is not up: `pm2 restart vocab`. The window retries every 1.5 s. |
 | No window, though the process runs | `ELECTRON_RUN_AS_NODE=1` in the environment makes Electron behave as plain Node. `scripts/overlay.sh` unsets it; do not launch the binary directly. |
 | The overlay quits right after starting | Its `userData` and single-instance lock collided with another Electron app. `main.mjs` sets both before `whenReady` — keep it that way. |
 | Nothing is heard | `tts.playOnHost` off, or no player installed. Settings shows which one was found. |
@@ -161,8 +161,8 @@ server/images.ts       Wikipedia lead image, cached
 - `contextIsolation` is on, Node is off in the renderer, and the preload exposes three methods:
   hide, quit, and the blur preference.
 
-Still available: `deploy/nginx-translator.localhost.conf` puts the same UI on
-`http://translator.localhost` (port 80 → 8787, loopback-only, `proxy_buffering off` so the answer
+Still available: `deploy/nginx-vocab.localhost.conf` puts the same UI on
+`http://vocab.localhost` (port 80 → 8787, loopback-only, `proxy_buffering off` so the answer
 still streams), for when a browser tab is more convenient.
 
 ## License

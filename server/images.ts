@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { cacheRoot, type TranslatorConfig } from './config.js'
+import { cacheRoot, type VocabConfig } from './config.js'
 import { cachedImage, rememberImage } from './db.js'
 
 /**
@@ -33,9 +33,9 @@ interface PageImageResponse {
   }
 }
 
-const UA = 'translator/1.0 (personal dictionary; local overlay)'
+const UA = 'vocab/1.0 (personal dictionary; local overlay)'
 
-function apiUrl(config: TranslatorConfig, params: Record<string, string>): string {
+function apiUrl(config: VocabConfig, params: Record<string, string>): string {
   const query = new URLSearchParams({
     action: 'query',
     format: 'json',
@@ -76,7 +76,7 @@ function pick(query: PageImageResponse['query']): RelatedImage | undefined {
 
 /** Wikipedia first; if the article has no picture, the best search hit's article. */
 export async function lookupImage(
-  config: TranslatorConfig,
+  config: VocabConfig,
   term: string,
 ): Promise<RelatedImage | undefined> {
   if (!config.images.enabled) return undefined

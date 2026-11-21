@@ -1,14 +1,14 @@
 /**
- * translator configuration.
+ * vocab configuration.
  *
  * Copy this file to `config.mjs` (git-ignored) and edit it there; the values
  * below are the defaults that apply when a key is missing. Config is a real
  * module, so comments, spreads and computed values all work.
  *
- * @typedef {object} TranslatorConfig
+ * @typedef {object} VocabConfig
  */
 
-/** @type {TranslatorConfig} */
+/** @type {VocabConfig} */
 export default {
   /**
    * Global shortcut that shows and hides the overlay. This is an Electron
@@ -32,7 +32,7 @@ export default {
     maxTokens: 1400,
     /** Dictionary work needs almost no thinking budget. */
     reasoning: { effort: 'low', exclude: true },
-    appName: 'translator',
+    appName: 'vocab',
     siteUrl: '',
   },
 
@@ -43,7 +43,7 @@ export default {
   },
 
   database: {
-    /** Defaults to <repo>/.data/translator.db. */
+    /** Defaults to <repo>/.data/vocab.db. */
     file: '',
   },
 

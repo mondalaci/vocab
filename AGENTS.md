@@ -23,7 +23,7 @@ npm run typecheck      # both TS projects, no output
 Always run `npm run typecheck` (or `npm run build`) before claiming a change works — the SPA and the
 server are separate TS projects (`tsconfig.app.json`, `tsconfig.server.json`).
 
-Either restart the pm2 apps (`pm2 restart translator translator-overlay`) or use `npm run dev` +
+Either restart the pm2 apps (`pm2 restart vocab vocab-overlay`) or use `npm run dev` +
 `npm run dev:overlay`. A plain `npm start` does **not** pick up server changes.
 
 ## Layout
@@ -84,6 +84,6 @@ A `paplay` entry on your default sink is the feature working. `ffprobe .cache/tt
 `pcm_s16le, 24000 Hz, mono`.
 
 For the overlay itself: `xdotool key ctrl+alt+shift+F12` toggles it, and `xdotool search --name
-translator` finds the window. When clicking something inside it, get the coordinates from the DOM
+vocab` finds the window. When clicking something inside it, get the coordinates from the DOM
 (load the same page in a browser at the window's CSS size) rather than estimating from a screenshot —
 guessing pixels lands on the scrim, which hides the window and looks like a broken click.

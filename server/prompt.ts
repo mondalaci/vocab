@@ -1,4 +1,4 @@
-import type { TranslatorConfig } from './config.js'
+import type { VocabConfig } from './config.js'
 import type { Direction } from './direction.js'
 
 export interface Turn {
@@ -13,7 +13,7 @@ export interface Turn {
  * carry pronunciation, because reading IPA off the overlay is the whole point.
  */
 export function systemPrompt(
-  config: TranslatorConfig,
+  config: VocabConfig,
   direction: Direction,
   extra = '',
 ): string {
@@ -69,7 +69,7 @@ ${config.chat.extraInstructions ? `\nAdditional instructions from config:\n${con
 
 /** System prompt plus the stored transcript, trimmed to the configured depth. */
 export function buildMessages(
-  config: TranslatorConfig,
+  config: VocabConfig,
   direction: Direction,
   history: Turn[],
   extra = '',

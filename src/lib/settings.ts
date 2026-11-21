@@ -1,6 +1,8 @@
 import { reactive, watch } from 'vue'
 
-const KEY = 'translator.overlay.v1'
+const KEY = 'vocab.overlay.v1'
+/** Where these settings lived before the app was renamed from "translator". */
+const LEGACY_KEY = 'translator.overlay.v1'
 
 export interface Settings {
   /** Voice override; empty means the voice from config.mjs. */
@@ -28,7 +30,8 @@ const DEFAULTS: Settings = {
 
 function load(): Partial<Settings> {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
+    const stored = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
+    return JSON.parse(stored ?? '{}') as Partial<Settings>
   } catch {
     return {}
   }

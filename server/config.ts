@@ -10,7 +10,7 @@ export interface Side {
   native: string
 }
 
-export interface TranslatorConfig {
+export interface VocabConfig {
   hotkey: string
   server: { port: number; host: string }
   openrouter: {
@@ -41,14 +41,14 @@ export interface TranslatorConfig {
 }
 
 export interface Loaded {
-  config: TranslatorConfig
+  config: VocabConfig
   file: string
   /** True when config.mjs was missing and only the example defaults applied. */
   usingDefaults: boolean
 }
 
 export function configFile(): string {
-  return process.env.TRANSLATOR_CONFIG?.trim() || path.join(projectRoot, 'config.mjs')
+  return process.env.VOCAB_CONFIG?.trim() || path.join(projectRoot, 'config.mjs')
 }
 
 export function dataDir(): string {
@@ -76,15 +76,15 @@ function merge<T>(base: T, override: unknown): T {
   return out as T
 }
 
-async function importModule(file: string): Promise<Partial<TranslatorConfig> | undefined> {
+async function importModule(file: string): Promise<Partial<VocabConfig> | undefined> {
   if (!fs.existsSync(file)) return undefined
   // A query string defeats the module cache, so an edited config is picked up.
   const url = `${pathToFileURL(file).href}?v=${fs.statSync(file).mtimeMs}`
-  const module = (await import(url)) as { default?: Partial<TranslatorConfig> }
+  const module = (await import(url)) as { default?: Partial<VocabConfig> }
   return module.default
 }
 
-function fromEnv(config: TranslatorConfig): TranslatorConfig {
+function fromEnv(config: VocabConfig): VocabConfig {
   const next = structuredClone(config)
   const port = Number(process.env.PORT)
   if (Number.isInteger(port) && port > 0) next.server.port = port
@@ -92,17 +92,17 @@ function fromEnv(config: TranslatorConfig): TranslatorConfig {
   if (process.env.OPENROUTER_API_KEY) next.openrouter.apiKey = process.env.OPENROUTER_API_KEY
   if (process.env.OPENROUTER_MODEL) next.openrouter.model = process.env.OPENROUTER_MODEL
   if (process.env.OPENROUTER_BASE_URL) next.openrouter.baseUrl = process.env.OPENROUTER_BASE_URL
-  if (process.env.TRANSLATOR_HOTKEY) next.hotkey = process.env.TRANSLATOR_HOTKEY
-  if (process.env.TRANSLATOR_DB) next.database.file = process.env.TRANSLATOR_DB
+  if (process.env.VOCAB_HOTKEY) next.hotkey = process.env.VOCAB_HOTKEY
+  if (process.env.VOCAB_DB) next.database.file = process.env.VOCAB_DB
   return next
 }
 
 export async function loadConfig(): Promise<Loaded> {
   const file = configFile()
   const examplePath = path.join(projectRoot, 'config.example.mjs')
-  const defaults = (await importModule(examplePath)) ?? ({} as Partial<TranslatorConfig>)
+  const defaults = (await importModule(examplePath)) ?? ({} as Partial<VocabConfig>)
   const user = await importModule(file)
-  const merged = merge(defaults as TranslatorConfig, user)
+  const merged = merge(defaults as VocabConfig, user)
   return {
     config: fromEnv(merged),
     file,
@@ -110,6 +110,6 @@ export async function loadConfig(): Promise<Loaded> {
   }
 }
 
-export function databaseFile(config: TranslatorConfig): string {
-  return config.database.file?.trim() || path.join(dataDir(), 'translator.db')
+export function databaseFile(config: VocabConfig): string {
+  return config.database.file?.trim() || path.join(dataDir(), 'vocab.db')
 }

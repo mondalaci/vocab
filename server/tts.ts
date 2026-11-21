@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { cacheRoot, type TranslatorConfig } from './config.js'
+import { cacheRoot, type VocabConfig } from './config.js'
 
 /**
  * Speech synthesis through OpenRouter's OpenAI-compatible `/audio/speech`
@@ -28,7 +28,7 @@ export class SpeechError extends Error {
   }
 }
 
-export function wavHeader(dataBytes: number, config: TranslatorConfig): Buffer {
+export function wavHeader(dataBytes: number, config: VocabConfig): Buffer {
   const { sampleRate, channels, bits } = config.tts.pcm
   const blockAlign = (channels * bits) / 8
   const header = Buffer.alloc(44)
@@ -52,14 +52,14 @@ export function cacheDir(): string {
   return path.join(cacheRoot(), 'tts')
 }
 
-function cacheFile(config: TranslatorConfig, text: string): string {
+function cacheFile(config: VocabConfig, text: string): string {
   const key = [config.tts.model, config.tts.voice, config.tts.instructions, text].join('\u0000')
   const hash = createHash('sha1').update(key).digest('hex').slice(0, 16)
   return path.join(cacheDir(), `${hash}.wav`)
 }
 
 export async function synthesize(
-  config: TranslatorConfig,
+  config: VocabConfig,
   text: string,
   overrides: { voice?: string; instructions?: string } = {},
 ): Promise<Speech> {

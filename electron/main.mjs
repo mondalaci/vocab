@@ -18,8 +18,8 @@ const projectRoot = path.resolve(here, '..')
 // Electron would call itself "Electron" and share ~/.config/Electron with every
 // other Electron app on the machine — whose single-instance lock then makes this
 // one quit on startup.
-app.setName('translator')
-app.setPath('userData', path.join(app.getPath('appData'), 'translator'))
+app.setName('vocab')
+app.setPath('userData', path.join(app.getPath('appData'), 'vocab'))
 // Note: run unpackaged, Electron reports WM_CLASS "electron" whatever we call
 // ourselves. It does not matter here — the window is skipped from the taskbar.
 
@@ -50,16 +50,16 @@ async function readConfig(file) {
 
 const config = merge(
   merge(DEFAULTS, await readConfig(path.join(projectRoot, 'config.example.mjs'))),
-  await readConfig(process.env.TRANSLATOR_CONFIG || path.join(projectRoot, 'config.mjs')),
+  await readConfig(process.env.VOCAB_CONFIG || path.join(projectRoot, 'config.mjs')),
 )
 
 const host = config.server.host === '0.0.0.0' ? '127.0.0.1' : config.server.host
 const targetUrl =
-  process.env.TRANSLATOR_OVERLAY_URL?.trim() ||
+  process.env.VOCAB_OVERLAY_URL?.trim() ||
   config.overlay.url?.trim() ||
   `http://${host}:${config.server.port}/`
 
-const hotkey = process.env.TRANSLATOR_HOTKEY?.trim() || config.hotkey
+const hotkey = process.env.VOCAB_HOTKEY?.trim() || config.hotkey
 
 let overlayWindow = null
 let hideOnBlur = Boolean(config.overlay.hideOnBlur)
@@ -172,7 +172,7 @@ app.whenReady().then(() => {
   console.log(`[overlay] ${hotkey} toggles the window`)
   console.log(`[overlay] loading ${targetUrl}`)
 
-  if (process.env.TRANSLATOR_DEBUG) {
+  if (process.env.VOCAB_DEBUG) {
     const beat = setInterval(() => {
       console.log(
         '[overlay] alive, windows:',

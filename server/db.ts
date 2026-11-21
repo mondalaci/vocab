@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { databaseFile, type TranslatorConfig } from './config.js'
+import { databaseFile, type VocabConfig } from './config.js'
 
 /** One chat thread: the word it started from, its direction and its transcript. */
 export interface Session {
@@ -58,7 +58,7 @@ create table if not exists image_cache (
 let db: DatabaseSync | null = null
 let dbPath = ''
 
-export function openDatabase(config: TranslatorConfig): DatabaseSync {
+export function openDatabase(config: VocabConfig): DatabaseSync {
   if (db) return db
   dbPath = databaseFile(config)
   fs.mkdirSync(path.dirname(dbPath), { recursive: true })

@@ -317,11 +317,11 @@ onBeforeUnmount(() => {
   <div class="stage">
     <div class="scrim" @click="hide" />
 
-    <main class="card" role="dialog" aria-label="translator lookup">
+    <main class="card" role="dialog" aria-label="vocab lookup">
       <header class="head">
         <div class="head__left">
           <span class="mark" aria-hidden="true">a→</span>
-          <strong class="head__title">translator</strong>
+          <strong class="head__title">vocab</strong>
           <button class="pill" :title="`Translate the other way round`" @click="flipDirection">
             {{ directionLabel }}
           </button>

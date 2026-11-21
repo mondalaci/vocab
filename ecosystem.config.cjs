@@ -9,7 +9,7 @@
 module.exports = {
   apps: [
     {
-      name: 'translator',
+      name: 'vocab',
       cwd: __dirname,
       // tsx directly, so there is no npm wrapper between pm2 and the server.
       script: 'node_modules/tsx/dist/cli.mjs',
@@ -20,7 +20,7 @@ module.exports = {
       env: { NODE_ENV: 'production' },
     },
     {
-      name: 'translator-overlay',
+      name: 'vocab-overlay',
       cwd: __dirname,
       script: 'scripts/overlay.sh',
       interpreter: 'bash',

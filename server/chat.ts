@@ -1,4 +1,4 @@
-import type { TranslatorConfig } from './config.js'
+import type { VocabConfig } from './config.js'
 import type { Turn } from './prompt.js'
 
 export interface StreamSink {
@@ -52,7 +52,7 @@ function safeParse(value: string): Chunk | undefined {
   }
 }
 
-function buildBody(config: TranslatorConfig, messages: Turn[]) {
+function buildBody(config: VocabConfig, messages: Turn[]) {
   const { openrouter } = config
   const reasoning = openrouter.reasoning ?? {}
   return {
@@ -69,7 +69,7 @@ function buildBody(config: TranslatorConfig, messages: Turn[]) {
 }
 
 export async function streamChat(
-  config: TranslatorConfig,
+  config: VocabConfig,
   messages: Turn[],
   sink: StreamSink,
   signal?: AbortSignal,
