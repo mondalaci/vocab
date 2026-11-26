@@ -325,8 +325,7 @@ onBeforeUnmount(() => {
     <main class="card" role="dialog" aria-label="vocab lookup">
       <header class="head">
         <div class="head__left">
-          <span class="mark" aria-hidden="true">a→</span>
-          <strong class="head__title">vocab</strong>
+          <strong class="head__title"><span class="head__v">v</span>ocab</strong>
           <button class="pill" :title="`Translate the other way round`" @click="flipDirection">
             {{ directionLabel }}
           </button>
@@ -448,15 +447,15 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.mark {
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 15px;
-}
-
 .head__title {
   font-size: 15px;
   letter-spacing: 0.01em;
+}
+
+/* The wordmark's first letter carries the accent: the header has one blue
+   touch, on the word itself, instead of a glyph standing beside it. */
+.head__v {
+  color: var(--accent);
 }
 
 .head__term {
