@@ -140,7 +140,7 @@ async function send(mode: 'new' | 'continue' = 'new'): Promise<void> {
   const active = new AbortController()
   controller = active
 
-  if (settings.autoSpeak) void speak(text)
+  let completed = false
 
   try {
     await chat(
@@ -163,6 +163,7 @@ async function send(mode: 'new' | 'continue' = 'new'): Promise<void> {
       },
       active.signal,
     )
+    completed = !active.signal.aborted
   } catch (error) {
     answer.streaming = false
     if (!active.signal.aborted) {
@@ -182,6 +183,10 @@ async function send(mode: 'new' | 'continue' = 'new'): Promise<void> {
     }
     scrollToEnd()
   }
+
+  // The answer is on screen and complete: the voice follows the look-up instead
+  // of racing it, so you read the word first and hear it second.
+  if (completed && answer.content.trim()) autoSpeakAnswer()
 }
 
 function applyMeta(event: Extract<ChatEvent, { type: 'meta' }>): void {
@@ -200,11 +205,7 @@ function abort(): void {
 }
 
 /** Everything the user hears comes out of this machine, not the browser. */
-async function speak(text: string): Promise<void> {
-  if (speaking.value) {
-    await stopSpeaking()
-    return
-  }
+async function play(text: string): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) return
   if (!status.value?.tts.available || !settings.playOnHost) {
@@ -223,6 +224,26 @@ async function speak(text: string): Promise<void> {
   } finally {
     speaking.value = false
   }
+}
+
+/** The P key toggles: a second press stops the speech. */
+async function speak(text: string): Promise<void> {
+  if (speaking.value) {
+    await stopSpeaking()
+    return
+  }
+  await play(text)
+}
+
+/**
+ * Says the headword once the answer has arrived. The voice follows the look-up
+ * rather than racing it — you read the word, then hear it — and it stays quiet
+ * when speech is switched off, because the settings already say so.
+ */
+function autoSpeakAnswer(): void {
+  if (!settings.autoSpeak || !settings.playOnHost || !status.value?.tts.available) return
+  const word = headwordOfLastAnswer()
+  if (word) void play(word)
 }
 
 async function stopSpeaking(): Promise<void> {
@@ -285,6 +306,13 @@ function onKey(event: KeyboardEvent): void {
     if (busy.value) abort()
     else if (view.value !== 'chat') view.value = 'chat'
     else hide()
+    return
+  }
+  if (event.altKey && event.key.toLowerCase() === 'c') {
+    event.preventDefault()
+    // Alt+C puts the caret back in the composer from wherever it wandered off to.
+    view.value = 'chat'
+    focusComposer()
     return
   }
   const modifier = event.altKey || event.ctrlKey || event.metaKey
@@ -389,7 +417,6 @@ onBeforeUnmount(() => {
         v-model:draft="draft"
         :bubbles="bubbles"
         :busy="busy"
-        :speaking="speaking"
         :sessions="sessions"
         @send="send"
         @stop="abort"

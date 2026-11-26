@@ -23,7 +23,7 @@ const VOICES = ['Kore', 'Puck', 'Charon', 'Zephyr', 'Fenrir', 'Leda', 'Orus', 'A
 
 const TOGGLES = [
   { key: 'playOnHost', label: 'Speak on this machine', hint: `${props.status.tts.player ?? 'no player'} → the default sink` },
-  { key: 'autoSpeak', label: 'Say the word automatically', hint: 'As soon as a look-up starts' },
+  { key: 'autoSpeak', label: 'Say the word automatically', hint: 'When the answer arrives' },
   { key: 'hideOnBlur', label: 'Hide when it loses focus', hint: 'Coming back means pressing the hotkey again' },
 ] as const
 

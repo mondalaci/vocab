@@ -9,7 +9,7 @@
   --card-2: #131317;
   /* Raised one step above --card-2: the bubble that echoes the user's own
      query has to be findable at a glance, and --card-2 on --card is not. */
-  --card-3: #202028;
+  --card-3: #2b2b35;
   --line: #22222a;
   --line-soft: #1a1a20;
   --fg: #ececec;

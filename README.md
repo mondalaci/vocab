@@ -81,6 +81,7 @@ pm2 logs vocab         # shows the hotkey it grabbed, and any load failure
 | `Enter` | start a new translation — a fresh conversation, even mid-thread |
 | `Ctrl`+`Enter` / `Shift`+`Enter` | follow-up in the conversation on screen |
 | `Alt`+`Enter` | newline in the composer |
+| `Alt`+`C` | focus the composer from anywhere in the overlay |
 | `P` | say the session's word out loud |
 | `Ctrl+K` | session list |
 | `Ctrl+N` | new session |
@@ -88,7 +89,8 @@ pm2 logs vocab         # shows the hotkey it grabbed, and any load failure
 | click any **bold** word | hear *that word* — the initial word, a follow-up's new word, either side of a `vs` |
 
 **Pronunciations.** Every word the model translates is bold, and each bold word is its own button.
-Nothing reads the whole answer aloud — a paragraph of TTS is noise when you want one word.
+Nothing reads the whole answer aloud — a paragraph of TTS is noise when you want one word. With
+**Say the word automatically** on (the default), the headword is spoken as soon as the answer arrives.
 
 **Follow-ups.** The thread keeps its direction and its history, so `vs haste`, `in what context`, or
 `give me three collocations` land where you expect. A later turn that introduces a new word gets the

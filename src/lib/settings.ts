@@ -9,7 +9,7 @@ export interface Settings {
   voice: string
   /** Play the speech on this machine instead of only the phone. */
   playOnHost: boolean
-  /** Read the headword aloud as soon as a look-up starts. */
+  /** Read the headword aloud once the look-up's answer arrives. */
   autoSpeak: boolean
   /** Hide the overlay when it loses focus. */
   hideOnBlur: boolean
@@ -20,7 +20,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   voice: '',
   playOnHost: true,
-  autoSpeak: false,
+  autoSpeak: true,
   hideOnBlur: false,
   lastSessionId: '',
 }
@@ -28,7 +28,16 @@ const DEFAULTS: Settings = {
 function load(): Partial<Settings> {
   try {
     const stored = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
-    return JSON.parse(stored ?? '{}') as Partial<Settings>
+    const parsed = JSON.parse(stored ?? '{}') as Partial<Settings> & { images?: boolean }
+    // Settings carried over from the pre-dictionary build still carry an
+    // `images` key, and the autoSpeak they saved belonged to the old "speak as
+    // soon as the look-up starts" behaviour. Drop both so the new default —
+    // say the answer once it arrives — takes effect.
+    if ('images' in parsed) {
+      delete parsed.images
+      delete parsed.autoSpeak
+    }
+    return parsed
   } catch {
     return {}
   }

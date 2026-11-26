@@ -1,24 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { plainText, renderMarkdown } from '@/lib/markdown'
-import { toast } from '@/lib/toast'
+import { renderMarkdown } from '@/lib/markdown'
 
 const props = defineProps<{
   content: string
   streaming: boolean
-  speaking: boolean
 }>()
 
 const emit = defineEmits<{ speak: [text: string] }>()
 
 const html = computed(() => renderMarkdown(props.content))
-
-/** The headword, so the pronounce chip says one word and not the whole answer. */
-const headword = computed(() => {
-  const match = /^\*\*(.+?)\*\*/m.exec(props.content)
-  if (!match?.[1]) return plainText(props.content).split(/\s+/).slice(0, 2).join(' ')
-  return match[1].replace(/\*.*$/, '').trim()
-})
 
 /**
  * Only the words being translated get pronounced: the prompt bolds exactly those
@@ -33,15 +24,6 @@ function onClick(event: MouseEvent): void {
   event.stopPropagation()
   emit('speak', word)
 }
-
-async function copy(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(plainText(props.content))
-    toast('Copied', 'success')
-  } catch {
-    toast('Clipboard is blocked here', 'error')
-  }
-}
 </script>
 
 <template>
@@ -49,34 +31,10 @@ async function copy(): Promise<void> {
     <!-- Markdown is sanitised in lib/markdown.ts before it reaches the DOM. -->
     <div
       class="md"
-      :class="{ 'md--streaming': streaming }"
+      :class="{ 'md--streaming': streaming, 'md--empty': streaming && !content }"
       v-html="html"
       @click="onClick"
     />
-
-    <div class="answer__tools">
-      <button
-        class="chip chip--play"
-        :class="{ 'chip--active': speaking }"
-        :disabled="streaming || !headword"
-        :title="`Say “${headword}” on this machine — P`"
-        @click="emit('speak', headword)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 9h3.2L12 5.4v13.2L7.2 15H4z" />
-          <path d="M15.4 8.8a4.4 4.4 0 0 1 0 6.4M17.8 6.4a7.6 7.6 0 0 1 0 11.2" />
-        </svg>
-        {{ speaking ? 'Stop' : `Say ${headword}` }}
-      </button>
-      <span class="answer__hint">click any bold word to hear it</span>
-      <button class="chip" title="Copy" @click="copy">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="9" y="9" width="11" height="11" rx="2" />
-          <path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15" />
-        </svg>
-        Copy
-      </button>
-    </div>
   </article>
 </template>
 
@@ -148,7 +106,8 @@ async function copy(): Promise<void> {
   font-size: 0.92em;
 }
 
-.md--streaming :deep(p:last-child)::after {
+.md--streaming :deep(p:last-child)::after,
+.md--empty::after {
   content: '▍';
   color: var(--accent);
   animation: blink 1s steps(2, start) infinite;
@@ -158,24 +117,5 @@ async function copy(): Promise<void> {
   to {
     visibility: hidden;
   }
-}
-
-.answer__tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  opacity: 0.55;
-  transition: opacity 0.15s ease;
-}
-
-.answer__hint {
-  color: var(--dimmer);
-  font-size: 11.5px;
-}
-
-.answer:hover .answer__tools,
-.answer__tools:focus-within {
-  opacity: 1;
 }
 </style>

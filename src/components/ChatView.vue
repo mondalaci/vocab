@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { SessionSummary } from '@/api'
-import { plainText } from '@/lib/markdown'
 import MessageCard from '@/components/MessageCard.vue'
 
 interface Bubble {
@@ -14,7 +13,6 @@ interface Bubble {
 const props = defineProps<{
   bubbles: Bubble[]
   busy: boolean
-  speaking: boolean
   sessions: SessionSummary[]
 }>()
 
@@ -47,51 +45,6 @@ function onKeydown(event: KeyboardEvent): void {
   submit(followUp ? 'continue' : 'new')
 }
 
-/**
- * The wait before the first token: the session is created, the history is read
- * and the model stream is opened, which can take a couple of seconds. Show that
- * something is happening, and for how long.
- */
-const waitingForFirstToken = computed(() => {
-  const last = props.bubbles.at(-1)
-  return Boolean(last && last.role === 'assistant' && last.streaming && !last.content)
-})
-
-const waited = ref(0)
-let ticker: ReturnType<typeof setInterval> | null = null
-
-watch(
-  waitingForFirstToken,
-  (waiting) => {
-    if (ticker) {
-      clearInterval(ticker)
-      ticker = null
-    }
-    waited.value = 0
-    if (waiting) {
-      ticker = setInterval(() => {
-        waited.value += 1
-      }, 1000)
-    }
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(() => {
-  if (ticker) clearInterval(ticker)
-})
-
-/** From the second token on, the caret in the answer is the progress. */
-function phaseLabel(): string {
-  return waited.value < 1 ? 'Looking it up…' : `Looking it up… ${waited.value}s`
-}
-
-/** The headword of an assistant bubble, for the per-message pronounce chip. */
-function headword(content: string): string {
-  const match = /^\*\*(.+?)\*\*/m.exec(content)
-  return match?.[1]?.replace(/\s*\*\[[^\]]*\]\*.*$/, '').trim() ?? plainText(content).slice(0, 60)
-}
-
 defineExpose({ focus: () => input.value?.focus() })
 </script>
 
@@ -118,15 +71,10 @@ defineExpose({ focus: () => input.value?.focus() })
 
     <template v-for="bubble in bubbles" :key="bubble.key">
       <p v-if="bubble.role === 'user'" class="said">{{ bubble.content }}</p>
-      <div v-else-if="bubble.streaming && !bubble.content" class="thinking" role="status">
-        <span class="thinking__dots" aria-hidden="true"><i /><i /><i /></span>
-        <span class="thinking__label">{{ phaseLabel() }}</span>
-      </div>
       <MessageCard
         v-else
         :content="bubble.content"
         :streaming="Boolean(bubble.streaming)"
-        :speaking="speaking"
         @speak="emit('speak', $event)"
       />
     </template>
@@ -206,60 +154,6 @@ defineExpose({ focus: () => input.value?.focus() })
   background: var(--card-3);
   border-radius: 12px 12px 3px 12px;
   font-size: 14.5px;
-}
-
-.thinking {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 4px 0 14px;
-  color: var(--dim);
-  font-size: 13.5px;
-}
-
-.thinking__dots {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.thinking__dots i {
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.thinking__dots i:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.thinking__dots i:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.thinking__label {
-  font-variant-numeric: tabular-nums;
-}
-
-@keyframes pulse {
-  0%,
-  70%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-  35% {
-    opacity: 1;
-    transform: translateY(-2px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .thinking__dots i {
-    animation: none;
-    opacity: 0.7;
-  }
 }
 
 .composer {
