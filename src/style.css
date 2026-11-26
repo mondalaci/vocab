@@ -7,6 +7,9 @@
   --bg: #000000;
   --card: #0b0b0d;
   --card-2: #131317;
+  /* Raised one step above --card-2: the bubble that echoes the user's own
+     query has to be findable at a glance, and --card-2 on --card is not. */
+  --card-3: #202028;
   --line: #22222a;
   --line-soft: #1a1a20;
   --fg: #ececec;

@@ -202,8 +202,8 @@ defineExpose({ focus: () => input.value?.focus() })
   width: fit-content;
   max-width: 70%;
   padding: 7px 12px;
-  color: var(--fg);
-  background: var(--card-2);
+  color: var(--fg-strong);
+  background: var(--card-3);
   border-radius: 12px 12px 3px 12px;
   font-size: 14.5px;
 }
