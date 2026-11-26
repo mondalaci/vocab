@@ -22,7 +22,6 @@ const VOICES = ['Kore', 'Puck', 'Charon', 'Zephyr', 'Fenrir', 'Leda', 'Orus', 'A
   'Rasalgethi', 'Laomedeia', 'Achernar', 'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird']
 
 const TOGGLES = [
-  { key: 'images', label: 'Related picture', hint: 'Wikipedia lead image on the first turn' },
   { key: 'playOnHost', label: 'Speak on this machine', hint: `${props.status.tts.player ?? 'no player'} → the default sink` },
   { key: 'autoSpeak', label: 'Say the word automatically', hint: 'As soon as a look-up starts' },
   { key: 'hideOnBlur', label: 'Hide when it loses focus', hint: 'Coming back means pressing the hotkey again' },
@@ -86,7 +85,7 @@ function quit(): void {
     </div>
 
     <div class="group">
-      <span class="group__label">Server</span>
+      <span class="group__label">Runtime</span>
       <dl class="facts">
         <dt>model</dt>
         <dd>{{ status.model }}</dd>
@@ -95,8 +94,6 @@ function quit(): void {
           {{ status.tts.model }} · {{ status.tts.player ?? 'no player found' }}
           <span v-if="!status.tts.available"> (unavailable)</span>
         </dd>
-        <dt>images</dt>
-        <dd>{{ status.images.enabled ? `${status.images.wiki}.wikipedia.org` : 'off' }}</dd>
         <dt>hotkey</dt>
         <dd>{{ status.hotkey }}</dd>
         <dt>database</dt>
@@ -107,8 +104,7 @@ function quit(): void {
         </dd>
         <dt>stored</dt>
         <dd>
-          {{ status.counts.sessions }} sessions · {{ status.counts.messages }} turns ·
-          {{ status.counts.images }} images
+          {{ status.counts.sessions }} sessions · {{ status.counts.messages }} turns
         </dd>
       </dl>
       <p v-if="!status.hasApiKey" class="warn">

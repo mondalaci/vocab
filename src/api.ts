@@ -1,156 +1,102 @@
-export interface SessionSummary {
-  id: string
-  title: string
-  direction: 'en-hu' | 'hu-en'
-  term: string | null
-  imageUrl: string | null
-  imageCredit: string | null
-  createdAt: number
-  updatedAt: number
-  turns: number
+import type {
+  ChatEvent,
+  ChatRequest,
+  Direction,
+  Message,
+  SessionDetail,
+  SessionSummary,
+  SpeakRequest,
+  SpeakResult,
+  Status,
+} from '../shared/protocol'
+
+export type {
+  ChatEvent,
+  ChatRequest,
+  Direction,
+  Message,
+  SessionDetail,
+  SessionSummary,
+  SpeakRequest,
+  SpeakResult,
+  Status,
 }
 
-export interface Message {
-  id: number
-  sessionId: string
-  role: 'user' | 'assistant'
-  content: string
-  createdAt: number
-}
-
-export interface RelatedImage {
-  src: string
-  credit: string | null
-  title: string | null
-}
-
-export interface Status {
-  model: string
-  hotkey: string
-  hasApiKey: boolean
-  languages: { source: { native: string }; target: { native: string } }
-  images: { enabled: boolean; wiki: string }
-  tts: {
-    enabled: boolean
-    model: string
-    voice: string
-    instructions: string
-    playOnHost: boolean
-    player: string | null
-    playerFound: boolean
-    available: boolean
+/**
+ * The renderer never speaks HTTP to this app any more. Everything goes over the
+ * preload bridge to the Electron main process, which owns SQLite, OpenRouter and
+ * speech; answers stream back as chat events. There is no server to reach and no
+ * port to guess.
+ */
+declare global {
+  interface Window {
+    vocab?: {
+      invoke<T = unknown>(method: string, payload?: unknown): Promise<T>
+      chatStart(payload: ChatRequest, onEvent: (event: ChatEvent) => void): string
+      chatCancel(streamId: string): void
+    }
   }
-  database: string
-  configFile: string
-  usingDefaults: boolean
-  counts: { sessions: number; messages: number; images: number }
-  version: string | null
 }
 
-export interface SpeakResult {
-  ok: true
-  audio: string
-  bytes: number
-  cached: boolean
-  model: string
-  voice: string
-  playedOnHost: boolean
-  player: string | null
-  playError: string | null
-}
-
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
-  const text = await response.text()
-  const data = text ? JSON.parse(text) : null
-  if (!response.ok) {
-    throw new Error((data as { error?: string } | null)?.error ?? response.statusText)
+function bridge(): NonNullable<Window['vocab']> {
+  const api = window.vocab
+  if (!api) {
+    throw new Error(
+      'The overlay backend is not available. Start the app with `npm start` (or `npm run dev:overlay`).',
+    )
   }
-  return data as T
+  return api
 }
 
 export const api = {
-  status: () => request<Status>('/api/status'),
-  sessions: (q = '') => request<{ sessions: SessionSummary[] }>(`/api/sessions?q=${encodeURIComponent(q)}`),
-  session: (id: string) =>
-    request<{ session: SessionSummary; messages: Message[]; image: RelatedImage | null }>(
-      `/api/sessions/${id}`,
-    ),
-  removeSession: (id: string) =>
-    request<{ ok: boolean }>(`/api/sessions/${id}`, { method: 'DELETE' }),
-  setDirection: (id: string, direction: 'en-hu' | 'hu-en') =>
-    request<{ ok: true; direction: string }>(`/api/sessions/${id}/direction`, {
-      method: 'POST',
-      body: JSON.stringify({ direction }),
-    }),
-  speak: (body: { text: string; voice?: string }) =>
-    request<SpeakResult>('/api/speak', { method: 'POST', body: JSON.stringify(body) }),
-  stopSpeech: () => request<{ ok: true; stopped: boolean }>('/api/speak/stop', { method: 'POST' }),
+  status: () => bridge().invoke<Status>('status'),
+  sessions: (q = '') => bridge().invoke<{ sessions: SessionSummary[] }>('sessions', { q }),
+  session: (id: string) => bridge().invoke<SessionDetail>('session', { id }),
+  removeSession: (id: string) => bridge().invoke<{ ok: boolean }>('removeSession', { id }),
+  setDirection: (id: string, direction: Direction) =>
+    bridge().invoke<{ ok: true; direction: string }>('setDirection', { id, direction }),
+  speak: (body: SpeakRequest) => bridge().invoke<SpeakResult>('speak', body),
+  stopSpeech: () => bridge().invoke<{ ok: true; stopped: boolean }>('stopSpeech'),
 }
 
-export type ChatEvent =
-  | {
-      type: 'meta'
-      sessionId: string
-      direction: 'en-hu' | 'hu-en'
-      term: string | null
-      fresh: boolean
-      userMessageId: number | null
-      image: RelatedImage | null
-    }
-  | { type: 'delta'; text: string }
-  | { type: 'done'; usage: Record<string, unknown> | null; model: string }
-  | { type: 'error'; status: number; message: string }
-
-const NL = String.fromCharCode(10)
-
-/** Streams one turn. The caller appends deltas as they arrive. */
-export async function chat(
-  body: { text: string; sessionId?: string; direction?: 'en-hu' | 'hu-en' },
+/** Streams one turn. Resolves on `done`, rejects on `error` or a broken call. */
+export function chat(
+  body: ChatRequest,
   onEvent: (event: ChatEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!response.ok || !response.body) {
-    const text = await response.text().catch(() => '')
-    let message = response.statusText
-    try {
-      message = (JSON.parse(text) as { error?: string }).error ?? message
-    } catch {
-      /* keep statusText */
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    let streamId = ''
+    const finish = (error?: Error) => {
+      if (settled) return
+      settled = true
+      signal.removeEventListener('abort', onAbort)
+      if (error) reject(error)
+      else resolve()
     }
-    throw new Error(message)
-  }
+    const onAbort = () => {
+      if (streamId) bridge().chatCancel(streamId)
+      finish()
+    }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  const handle = (line: string) => {
-    const trimmed = line.trim()
-    if (!trimmed.startsWith('data:')) return
-    const event = JSON.parse(trimmed.slice(5).trim()) as ChatEvent
-    if (event.type === 'error') throw new Error(event.message)
-    onEvent(event)
-  }
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split(NL)
-      buffer = lines.pop() ?? ''
-      for (const line of lines) handle(line)
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) {
+      finish()
+      return
     }
-    handle(buffer)
-  } finally {
-    reader.releaseLock()
-  }
+
+    try {
+      streamId = bridge().chatStart(body, (event) => {
+        if (event.type === 'error') {
+          finish(new Error(event.message))
+          return
+        }
+        onEvent(event)
+        if (event.type === 'done') finish()
+      })
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(String(error)))
+    }
+  })
 }

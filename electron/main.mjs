@@ -2,17 +2,42 @@
  * The overlay itself: one frameless, transparent, always-on-top window that
  * stays hidden until the hotkey is pressed.
  *
- * It is a normal Electron main process (Node), which is what makes the global
- * shortcut solid — `globalShortcut` grabs the key through X11 rather than
- * polling for it, which is the part that every "osd" package got wrong.
+ * It is also the whole backend. SQLite, OpenRouter, Wikipedia and speech used to
+ * live in a separate express process reached over loopback HTTP; they are now
+ * imported here and the renderer talks to them over IPC. There is no port, no
+ * static server and nothing on the network — just this window.
+ *
+ * `main.mjs` is bundled by esbuild into `dist-electron/main.mjs` (see
+ * `npm run build:main`) so it can import the TypeScript modules in `server/`.
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  net,
+  protocol,
+  screen,
+} from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { loadConfig } from '../server/config.ts'
+import { createService } from '../server/service.ts'
+import { registerApi } from '../server/ipc.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(here, '..')
+const distDir = path.join(projectRoot, 'dist')
+
+/** Speech clips: `vocab://tts/<file>.wav`. */
+const SCHEME = 'vocab'
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
+])
 
 // Before anything else: give this app its own identity. Run as a bare script,
 // Electron would call itself "Electron" and share ~/.config/Electron with every
@@ -20,45 +45,14 @@ const projectRoot = path.resolve(here, '..')
 // one quit on startup.
 app.setName('vocab')
 app.setPath('userData', path.join(app.getPath('appData'), 'vocab'))
-// Note: run unpackaged, Electron reports WM_CLASS "electron" whatever we call
-// ourselves. It does not matter here — the window is skipped from the taskbar.
 
-const DEFAULTS = {
-  hotkey: 'Control+Alt+Shift+F12',
-  server: { port: 8787, host: '127.0.0.1' },
-  overlay: { url: '', scrim: 0.55, hideOnBlur: false, skipTaskbar: true },
-}
+const loaded = await loadConfig()
+const config = loaded.config
+const service = createService(config, loaded)
 
-function isPlainObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function merge(base, override) {
-  if (!isPlainObject(override)) return base
-  const out = { ...base }
-  for (const [key, value] of Object.entries(override)) {
-    out[key] = isPlainObject(value) && isPlainObject(out[key]) ? merge(out[key], value) : value
-  }
-  return out
-}
-
-async function readConfig(file) {
-  if (!fs.existsSync(file)) return undefined
-  const url = `${pathToFileURL(file).href}?v=${fs.statSync(file).mtimeMs}`
-  return (await import(url)).default
-}
-
-const config = merge(
-  merge(DEFAULTS, await readConfig(path.join(projectRoot, 'config.example.mjs'))),
-  await readConfig(process.env.VOCAB_CONFIG || path.join(projectRoot, 'config.mjs')),
-)
-
-const host = config.server.host === '0.0.0.0' ? '127.0.0.1' : config.server.host
-const targetUrl =
-  process.env.VOCAB_OVERLAY_URL?.trim() ||
-  config.overlay.url?.trim() ||
-  `http://${host}:${config.server.port}/`
-
+const hasBuild = fs.existsSync(path.join(distDir, 'index.html'))
+const devUrl = (process.env.VOCAB_OVERLAY_URL || config.overlay.url || '').trim()
+const targetUrl = devUrl || `${SCHEME}://app/`
 const hotkey = process.env.VOCAB_HOTKEY?.trim() || config.hotkey
 
 let overlayWindow = null
@@ -69,6 +63,57 @@ function bounds() {
   // Work area, so a panel or dock is not covered up.
   const { workArea } = screen.getPrimaryDisplay()
   return workArea
+}
+
+/** Static files for the `vocab://app/` origin, straight from dist/. */
+function serveFromDist(pathname) {
+  const relative =
+    pathname === '' || pathname === '/'
+      ? 'index.html'
+      : decodeURIComponent(pathname).replace(/^\/+/, '')
+  const file = path.resolve(distDir, relative)
+  if (file !== distDir && !file.startsWith(distDir + path.sep)) {
+    return new Response('Not found', { status: 404 })
+  }
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    return new Response('Not found', { status: 404 })
+  }
+  return net.fetch(pathToFileURL(file).href)
+}
+
+function registerProtocol() {
+  protocol.handle(SCHEME, async (request) => {
+    const url = new URL(request.url)
+    if (url.host === 'app') return serveFromDist(url.pathname)
+
+    if (url.host === 'tts') {
+      const name = path.basename(decodeURIComponent(url.pathname))
+      const file = service.ttsFile(name)
+      if (!file) return new Response('No such clip.', { status: 404 })
+      return net.fetch(pathToFileURL(file).href)
+    }
+
+    return new Response('Not found', { status: 404 })
+  })
+}
+
+/** The renderer's view of the backend: invoke for calls, send for cancellation. */
+function registerTransport() {
+  registerApi(
+    {
+      handle: (method, handler) =>
+        ipcMain.handle(`${SCHEME}:${method}`, (event, payload) =>
+          handler(payload, {
+            send: (channel, data) => {
+              if (!event.sender.isDestroyed()) event.sender.send(`${SCHEME}:${channel}`, data)
+            },
+          }),
+        ),
+      receive: (message, handler) =>
+        ipcMain.on(`${SCHEME}:${message}`, (_event, payload) => handler(payload)),
+    },
+    service,
+  )
 }
 
 function createWindow() {
@@ -89,7 +134,7 @@ function createWindow() {
     alwaysOnTop: true,
     acceptFirstMouse: true,
     webPreferences: {
-      preload: path.join(here, 'preload.mjs'),
+      preload: path.join(projectRoot, 'electron', 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       // ESM preload scripts need the sandbox off; nothing else is exposed.
@@ -111,8 +156,19 @@ function createWindow() {
   load()
 }
 
-/** The server may still be starting (or restarting under pm2) — keep trying. */
+/** A dev server may still be starting — keep trying. A missing build is fatal. */
 function load() {
+  if (!devUrl && !hasBuild) {
+    overlayWindow.loadURL(
+      'data:text/html;charset=utf-8,' +
+        encodeURIComponent(
+          '<body style="background:#0b0b0f;color:#ddd;font:15px system-ui;padding:2rem">' +
+            '<h1 style="font-size:17px">No build yet</h1>' +
+            '<p>Run <code>npm run build</code> in the vocab project, then restart the overlay.</p>',
+        ),
+    )
+    return
+  }
   overlayWindow
     .loadURL(targetUrl)
     .then(() => {
@@ -163,6 +219,8 @@ if (!lock) {
 }
 
 app.whenReady().then(() => {
+  registerProtocol()
+  registerTransport()
   createWindow()
 
   const registered = globalShortcut.register(hotkey, toggle)
@@ -171,6 +229,9 @@ app.whenReady().then(() => {
   }
   console.log(`[overlay] ${hotkey} toggles the window`)
   console.log(`[overlay] loading ${targetUrl}`)
+  console.log(
+    `[overlay] database ${service.status().database} · config ${loaded.file}${loaded.usingDefaults ? ' (missing, using defaults)' : ''}`,
+  )
 
   if (process.env.VOCAB_DEBUG) {
     const beat = setInterval(() => {

@@ -6,7 +6,9 @@
  * flip in one click, so a wrong guess is never more than a tap away.
  */
 
-export type Direction = 'en-hu' | 'hu-en'
+import type { Direction } from '../shared/protocol.js'
+
+export type { Direction }
 
 export interface Guess {
   direction: Direction

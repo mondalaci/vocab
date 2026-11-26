@@ -12,7 +12,6 @@ export interface Side {
 
 export interface VocabConfig {
   hotkey: string
-  server: { port: number; host: string }
   openrouter: {
     apiKey: string
     baseUrl: string
@@ -25,7 +24,6 @@ export interface VocabConfig {
   }
   languages: { source: Side; target: Side }
   database: { file: string }
-  images: { enabled: boolean; wiki: string; width: number; cache: boolean }
   tts: {
     enabled: boolean
     model: string
@@ -55,7 +53,7 @@ export function dataDir(): string {
   return path.join(projectRoot, '.data')
 }
 
-/** Where synthesised speech clips and cached images live. */
+/** Where synthesised speech clips live. */
 export function cacheRoot(): string {
   return path.join(projectRoot, '.cache')
 }
@@ -86,9 +84,6 @@ async function importModule(file: string): Promise<Partial<VocabConfig> | undefi
 
 function fromEnv(config: VocabConfig): VocabConfig {
   const next = structuredClone(config)
-  const port = Number(process.env.PORT)
-  if (Number.isInteger(port) && port > 0) next.server.port = port
-  if (process.env.HOST) next.server.host = process.env.HOST
   if (process.env.OPENROUTER_API_KEY) next.openrouter.apiKey = process.env.OPENROUTER_API_KEY
   if (process.env.OPENROUTER_MODEL) next.openrouter.model = process.env.OPENROUTER_MODEL
   if (process.env.OPENROUTER_BASE_URL) next.openrouter.baseUrl = process.env.OPENROUTER_BASE_URL

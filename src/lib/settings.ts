@@ -7,8 +7,6 @@ const LEGACY_KEY = 'translator.overlay.v1'
 export interface Settings {
   /** Voice override; empty means the voice from config.mjs. */
   voice: string
-  /** Ask for a related picture on the first turn. */
-  images: boolean
   /** Play the speech on this machine instead of only the phone. */
   playOnHost: boolean
   /** Read the headword aloud as soon as a look-up starts. */
@@ -21,7 +19,6 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   voice: '',
-  images: true,
   playOnHost: true,
   autoSpeak: false,
   hideOnBlur: false,

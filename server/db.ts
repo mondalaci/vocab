@@ -2,16 +2,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { databaseFile, type VocabConfig } from './config.js'
+import type { Direction } from '../shared/protocol.js'
 
 /** One chat thread: the word it started from, its direction and its transcript. */
 export interface Session {
   id: string
   title: string
-  /** 'en-hu' or 'hu-en'. */
-  direction: string
+  direction: Direction
   term: string | null
-  imageUrl: string | null
-  imageCredit: string | null
   createdAt: number
   updatedAt: number
   turns: number
@@ -31,8 +29,6 @@ create table if not exists sessions (
   title text not null,
   direction text not null,
   term text,
-  image_url text,
-  image_credit text,
   created_at integer not null,
   updated_at integer not null
 );
@@ -46,13 +42,6 @@ create table if not exists messages (
 );
 
 create index if not exists messages_by_session on messages(session_id, id);
-
-create table if not exists image_cache (
-  term text primary key,
-  url text,
-  credit text,
-  fetched_at integer not null
-);
 `
 
 let db: DatabaseSync | null = null
@@ -81,27 +70,16 @@ function database(): DatabaseSync {
 export function createSession(input: {
   id: string
   title: string
-  direction: string
+  direction: Direction
   term: string | null
-  imageUrl?: string | null
-  imageCredit?: string | null
 }): Session {
   const now = Date.now()
   database()
     .prepare(
-      `insert into sessions (id, title, direction, term, image_url, image_credit, created_at, updated_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `insert into sessions (id, title, direction, term, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?)`,
     )
-    .run(
-      input.id,
-      input.title,
-      input.direction,
-      input.term,
-      input.imageUrl ?? null,
-      input.imageCredit ?? null,
-      now,
-      now,
-    )
+    .run(input.id, input.title, input.direction, input.term, now, now)
   return getSession(input.id)!.session
 }
 
@@ -131,10 +109,8 @@ export function addMessage(
 interface SessionRecord {
   id: string
   title: string
-  direction: string
+  direction: Direction
   term: string | null
-  image_url: string | null
-  image_credit: string | null
   created_at: number
   updated_at: number
   turns: number
@@ -144,10 +120,8 @@ function toSession(row: SessionRecord): Session {
   return {
     id: row.id,
     title: row.title,
-    direction: row.direction,
+    direction: row.direction as Direction,
     term: row.term,
-    imageUrl: row.image_url,
-    imageCredit: row.image_credit,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     turns: row.turns,
@@ -215,7 +189,7 @@ export function deleteSession(id: string): boolean {
 
 export function updateSession(
   id: string,
-  patch: { title?: string; term?: string; direction?: string; imageUrl?: string; imageCredit?: string },
+  patch: { title?: string; term?: string; direction?: Direction },
 ): void {
   const sets: string[] = []
   const values: (string | number)[] = []
@@ -231,14 +205,6 @@ export function updateSession(
     sets.push('direction = ?')
     values.push(patch.direction)
   }
-  if (patch.imageUrl !== undefined) {
-    sets.push('image_url = ?')
-    values.push(patch.imageUrl)
-  }
-  if (patch.imageCredit !== undefined) {
-    sets.push('image_credit = ?')
-    values.push(patch.imageCredit)
-  }
   if (!sets.length) return
   sets.push('updated_at = ?')
   values.push(Date.now())
@@ -248,33 +214,11 @@ export function updateSession(
     .run(...values)
 }
 
-export function cachedImage(term: string): { url: string | null; credit: string | null } | undefined {
-  const row = database()
-    .prepare('select url, credit from image_cache where term = ?')
-    .get(term.toLowerCase()) as { url: string | null; credit: string | null } | undefined
-  return row
-}
-
-export function rememberImage(
-  term: string,
-  url: string | null,
-  credit: string | null,
-): void {
-  database()
-    .prepare(
-      `insert into image_cache (term, url, credit, fetched_at) values (?, ?, ?, ?)
-       on conflict(term) do update set url = excluded.url, credit = excluded.credit,
-                                       fetched_at = excluded.fetched_at`,
-    )
-    .run(term.toLowerCase(), url, credit, Date.now())
-}
-
-export function stats(): { sessions: number; messages: number; images: number } {
+export function stats(): { sessions: number; messages: number } {
   const db = database()
   const one = (sql: string) => Number((db.prepare(sql).get() as { n: number }).n)
   return {
     sessions: one('select count(*) as n from sessions'),
     messages: one('select count(*) as n from messages'),
-    images: one('select count(*) as n from image_cache'),
   }
 }

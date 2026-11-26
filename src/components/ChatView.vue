@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { RelatedImage, SessionSummary } from '@/api'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import type { SessionSummary } from '@/api'
 import { plainText } from '@/lib/markdown'
 import MessageCard from '@/components/MessageCard.vue'
 
@@ -13,14 +13,13 @@ interface Bubble {
 
 const props = defineProps<{
   bubbles: Bubble[]
-  image: RelatedImage | null
   busy: boolean
   speaking: boolean
   sessions: SessionSummary[]
 }>()
 
 const emit = defineEmits<{
-  send: []
+  send: [mode: 'new' | 'continue']
   stop: []
   speak: [text: string]
   open: [id: string]
@@ -30,20 +29,61 @@ const draft = defineModel<string>('draft', { required: true })
 const input = ref<HTMLTextAreaElement | null>(null)
 
 const starters = computed(() => props.sessions.slice(0, 6))
-const firstAssistantKey = computed(
-  () => props.bubbles.find((bubble) => bubble.role === 'assistant')?.key ?? '',
-)
 
-function submit(): void {
+/** Enter starts a new conversation; the button on its own does the same. */
+function submit(mode: 'new' | 'continue' = 'new'): void {
   if (!draft.value.trim() || props.busy) return
-  emit('send')
+  emit('send', mode)
 }
 
+/**
+ * Enter: a fresh translation. Ctrl+Enter / Shift+Enter: a follow-up in the
+ * thread on screen. Alt+Enter is the way to type a line break instead.
+ */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    submit()
-  }
+  if (event.key !== 'Enter' || event.altKey) return
+  event.preventDefault()
+  const followUp = event.ctrlKey || event.metaKey || event.shiftKey
+  submit(followUp ? 'continue' : 'new')
+}
+
+/**
+ * The wait before the first token: the session is created, the history is read
+ * and the model stream is opened, which can take a couple of seconds. Show that
+ * something is happening, and for how long.
+ */
+const waitingForFirstToken = computed(() => {
+  const last = props.bubbles.at(-1)
+  return Boolean(last && last.role === 'assistant' && last.streaming && !last.content)
+})
+
+const waited = ref(0)
+let ticker: ReturnType<typeof setInterval> | null = null
+
+watch(
+  waitingForFirstToken,
+  (waiting) => {
+    if (ticker) {
+      clearInterval(ticker)
+      ticker = null
+    }
+    waited.value = 0
+    if (waiting) {
+      ticker = setInterval(() => {
+        waited.value += 1
+      }, 1000)
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (ticker) clearInterval(ticker)
+})
+
+/** From the second token on, the caret in the answer is the progress. */
+function phaseLabel(): string {
+  return waited.value < 1 ? 'Looking it up…' : `Looking it up… ${waited.value}s`
 }
 
 /** The headword of an assistant bubble, for the per-message pronounce chip. */
@@ -60,8 +100,9 @@ defineExpose({ focus: () => input.value?.focus() })
     <div v-if="!bubbles.length" class="empty">
       <p class="empty__lead">Type a word in either language.</p>
       <p class="empty__sub">
-        English or Hungarian — the direction is detected, and follow-ups like
-        <em>vs haste</em> or <em>more examples</em> stay in the same thread.
+        English or Hungarian — the direction is detected. <kbd>Enter</kbd> starts a new
+        translation, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or <kbd>Shift</kbd>+<kbd>Enter</kbd>)
+        asks a follow-up like <em>vs haste</em> or <em>more examples</em> in the thread on screen.
       </p>
       <div v-if="starters.length" class="empty__recent">
         <button
@@ -77,31 +118,46 @@ defineExpose({ focus: () => input.value?.focus() })
 
     <template v-for="bubble in bubbles" :key="bubble.key">
       <p v-if="bubble.role === 'user'" class="said">{{ bubble.content }}</p>
+      <div v-else-if="bubble.streaming && !bubble.content" class="thinking" role="status">
+        <span class="thinking__dots" aria-hidden="true"><i /><i /><i /></span>
+        <span class="thinking__label">{{ phaseLabel() }}</span>
+      </div>
       <MessageCard
         v-else
         :content="bubble.content"
         :streaming="Boolean(bubble.streaming)"
-        :image="bubble.key === firstAssistantKey ? image : null"
         :speaking="speaking"
         @speak="emit('speak', $event)"
       />
     </template>
   </div>
 
-  <form class="composer" @submit.prevent="submit">
+  <form class="composer" @submit.prevent="submit('new')">
     <textarea
       ref="input"
       v-model="draft"
       class="field composer__input"
       rows="1"
-      placeholder="word or phrase — or ask a follow-up…"
+      placeholder="word or phrase — ↵ new, Ctrl+↵ follow-up, Alt+↵ newline"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
       @keydown="onKeydown"
     />
     <button v-if="busy" class="composer__go" type="button" @click="emit('stop')">Stop</button>
-    <button v-else class="composer__go" type="submit" :disabled="!draft.trim()">Look up</button>
+    <template v-else>
+      <button
+        v-if="bubbles.length"
+        class="composer__follow"
+        type="button"
+        :disabled="!draft.trim()"
+        title="Ask a follow-up in this thread (Ctrl+Enter or Shift+Enter)"
+        @click="submit('continue')"
+      >
+        Follow up
+      </button>
+      <button class="composer__go" type="submit" :disabled="!draft.trim()">Look up</button>
+    </template>
   </form>
 </template>
 
@@ -152,6 +208,60 @@ defineExpose({ focus: () => input.value?.focus() })
   font-size: 14.5px;
 }
 
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 0 14px;
+  color: var(--dim);
+  font-size: 13.5px;
+}
+
+.thinking__dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.thinking__dots i {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.thinking__dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking__dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.thinking__label {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking__dots i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 .composer {
   display: flex;
   align-items: flex-end;
@@ -180,9 +290,26 @@ defineExpose({ focus: () => input.value?.focus() })
   font-weight: 650;
 }
 
-.composer__go:disabled {
+.composer__go:disabled,
+.composer__follow:disabled {
   color: var(--dimmer);
   background: var(--card-2);
   cursor: default;
+}
+
+.composer__follow {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 14px;
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 550;
+}
+
+.composer__follow:not(:disabled):hover {
+  color: var(--fg);
+  border-color: var(--dim);
 }
 </style>

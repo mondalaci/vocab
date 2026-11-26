@@ -17,12 +17,6 @@ export default {
    */
   hotkey: 'Control+Alt+Shift+F12',
 
-  server: {
-    port: 8787,
-    /** Loopback only: the overlay runs on this machine, nothing else talks to it. */
-    host: '127.0.0.1',
-  },
-
   openrouter: {
     /** Your key. Env: OPENROUTER_API_KEY. */
     apiKey: '',
@@ -45,20 +39,6 @@ export default {
   database: {
     /** Defaults to <repo>/.data/vocab.db. */
     file: '',
-  },
-
-  images: {
-    /**
-     * A real photo for the headword when one exists, fetched from Wikipedia.
-     * Nothing is generated, and abstract words simply come back without one.
-     */
-    enabled: true,
-    /** Wikipedia project to ask: 'en', 'hu', ... */
-    wiki: 'en',
-    /** Thumbnail width in pixels. */
-    width: 640,
-    /** Longest edge of the file cached next to the database. */
-    cache: true,
   },
 
   tts: {

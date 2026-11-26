@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { RelatedImage } from '@/api'
 import { plainText, renderMarkdown } from '@/lib/markdown'
 import { toast } from '@/lib/toast'
 
 const props = defineProps<{
   content: string
   streaming: boolean
-  image: RelatedImage | null
   speaking: boolean
 }>()
 
@@ -36,15 +34,6 @@ function onClick(event: MouseEvent): void {
   emit('speak', word)
 }
 
-const imageHost = computed(() => {
-  if (!props.image?.credit) return ''
-  try {
-    return new URL(props.image.credit).hostname.replace(/^www\./, '')
-  } catch {
-    return ''
-  }
-})
-
 async function copy(): Promise<void> {
   try {
     await navigator.clipboard.writeText(plainText(props.content))
@@ -64,13 +53,6 @@ async function copy(): Promise<void> {
       v-html="html"
       @click="onClick"
     />
-
-    <figure v-if="image" class="shot">
-      <img :src="image.src" :alt="image.title ?? headword" loading="lazy" />
-      <a v-if="image.credit" class="shot__credit" :href="image.credit" target="_blank" rel="noreferrer">
-        {{ imageHost }}
-      </a>
-    </figure>
 
     <div class="answer__tools">
       <button
@@ -176,33 +158,6 @@ async function copy(): Promise<void> {
   to {
     visibility: hidden;
   }
-}
-
-.shot {
-  position: relative;
-  margin: 10px 0 8px;
-  width: fit-content;
-}
-
-.shot img {
-  display: block;
-  max-width: 220px;
-  max-height: 150px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.shot__credit {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  padding: 1px 6px;
-  color: #ddd;
-  background: rgba(0, 0, 0, 0.65);
-  border-radius: 6px;
-  font-size: 10.5px;
-  text-decoration: none;
 }
 
 .answer__tools {

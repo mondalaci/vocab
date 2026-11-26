@@ -7,3 +7,4 @@ config.local.*
 *.log
 .DS_Store
 .vite/
+dist-electron/

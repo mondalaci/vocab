@@ -13,5 +13,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["server/**/*.ts", "scripts/**/*.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"]
 }

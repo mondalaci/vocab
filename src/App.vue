@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { api, chat, type ChatEvent, type RelatedImage, type SessionSummary, type Status } from '@/api'
+import { api, chat, type ChatEvent, type SessionSummary, type Status } from '@/api'
 import { toast, toasts } from '@/lib/toast'
 import { settings } from '@/lib/settings'
 import ChatView from '@/components/ChatView.vue'
@@ -21,7 +21,6 @@ const sessions = ref<SessionSummary[]>([])
 const sessionId = ref('')
 const term = ref<string | null>(null)
 const direction = ref<'en-hu' | 'hu-en'>('en-hu')
-const image = ref<RelatedImage | null>(null)
 const bubbles = ref<Bubble[]>([])
 const view = ref<View>('chat')
 const busy = ref(false)
@@ -61,14 +60,13 @@ async function loadStatus(): Promise<void> {
 
 function applySession(
   id: string,
-  next: { term?: string | null; direction?: 'en-hu' | 'hu-en'; image?: RelatedImage | null },
+  next: { term?: string | null; direction?: 'en-hu' | 'hu-en' },
   messages: { role: 'user' | 'assistant'; content: string }[] = [],
 ): void {
   sessionId.value = id
   settings.lastSessionId = id
   term.value = next.term ?? null
   if (next.direction) direction.value = next.direction
-  if (next.image !== undefined) image.value = next.image
   bubbles.value = messages.map((message) => ({
     key: `m${key++}`,
     role: message.role,
@@ -79,11 +77,11 @@ function applySession(
 async function openSession(id: string): Promise<void> {
   try {
     const found = await api.session(id)
-    applySession(id, {
-      term: found.session.term,
-      direction: found.session.direction,
-      image: found.image,
-    }, found.messages)
+    applySession(
+      id,
+      { term: found.session.term, direction: found.session.direction },
+      found.messages,
+    )
     view.value = 'chat'
     focusComposer()
   } catch (error) {
@@ -92,7 +90,6 @@ async function openSession(id: string): Promise<void> {
     if (settings.lastSessionId === id) settings.lastSessionId = ''
     sessionId.value = ''
     term.value = null
-    image.value = null
     bubbles.value = []
     if (error instanceof Error && !/no such session/i.test(error.message)) {
       toast(error.message, 'error')
@@ -105,18 +102,27 @@ async function newSession(): Promise<void> {
   sessionId.value = ''
   settings.lastSessionId = ''
   term.value = null
-  image.value = null
   bubbles.value = []
   draft.value = ''
   view.value = 'chat'
   focusComposer()
 }
 
-async function send(): Promise<void> {
+async function send(mode: 'new' | 'continue' = 'new'): Promise<void> {
   const text = draft.value.trim()
   if (!text || busy.value) return
   draft.value = ''
   view.value = 'chat'
+
+  // Enter starts a new conversation, so whatever was on screen belongs to the
+  // previous thread: it is already saved, and leaving it visible would suggest
+  // the follow-up went into it.
+  if (mode === 'new') {
+    sessionId.value = ''
+    settings.lastSessionId = ''
+    term.value = null
+    bubbles.value = []
+  }
 
   bubbles.value.push({ key: `u${key++}`, role: 'user', content: text })
   const answer: Bubble = { key: `a${key++}`, role: 'assistant', content: '', streaming: true }
@@ -176,7 +182,6 @@ function applyMeta(event: Extract<ChatEvent, { type: 'meta' }>): void {
   if (event.fresh) {
     term.value = event.term
     direction.value = event.direction
-    image.value = settings.images ? event.image : null
   }
 }
 
@@ -353,6 +358,8 @@ onBeforeUnmount(() => {
         </nav>
       </header>
 
+      <div v-if="busy" class="progress" role="progressbar" aria-label="Look-up in progress" />
+
       <SessionPanel
         v-if="view === 'sessions'"
         :sessions="sessions"
@@ -368,7 +375,6 @@ onBeforeUnmount(() => {
         v-else
         v-model:draft="draft"
         :bubbles="bubbles"
-        :image="settings.images ? image : null"
         :busy="busy"
         :speaking="speaking"
         :sessions="sessions"
@@ -379,11 +385,11 @@ onBeforeUnmount(() => {
       />
 
       <footer class="foot">
-        <span><kbd>↵</kbd> send</span>
-        <span><kbd>⇧↵</kbd> newline</span>
-        <span><kbd>P</kbd> say the word</span>
-        <span>click any bold word to hear it</span>
-        <span v-if="status"><kbd>{{ status.hotkey }}</kbd> toggle overlay</span>
+        <span><kbd>↵</kbd> new</span>
+        <span><kbd>Ctrl</kbd>+<kbd>↵</kbd> follow-up</span>
+        <span><kbd>Alt</kbd>+<kbd>↵</kbd> line break</span>
+        <span><kbd>P</kbd> say</span>
+        <span v-if="status"><kbd>{{ status.hotkey }}</kbd> toggle</span>
         <span class="foot__grow" />
         <span v-if="status?.tts.available" class="foot__model">{{ status.model }}</span>
       </footer>
@@ -461,6 +467,42 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+/* An indeterminate bar under the header: the look-up is running, and the answer
+   itself streams into the transcript below. */
+.progress {
+  position: relative;
+  flex: none;
+  height: 2px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.progress::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: slide 1.15s ease-in-out infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(390%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress::before {
+    width: 100%;
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 .foot {
   display: flex;
   align-items: center;
@@ -469,16 +511,24 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--line-soft);
   color: var(--dimmer);
   font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.foot > span {
+  flex: none;
 }
 
 .foot__grow {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .foot__model {
+  overflow: hidden;
   color: var(--dimmer);
   font-family: ui-monospace, Menlo, monospace;
   font-size: 11px;
+  text-overflow: ellipsis;
 }
 
 .toasts {
