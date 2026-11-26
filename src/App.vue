@@ -24,7 +24,6 @@ const direction = ref<'en-hu' | 'hu-en'>('en-hu')
 const bubbles = ref<Bubble[]>([])
 const view = ref<View>('chat')
 const busy = ref(false)
-const speaking = ref(false)
 const draft = ref('')
 
 let controller: AbortController | null = null
@@ -212,7 +211,6 @@ async function play(text: string): Promise<void> {
     toast('Speech is switched off, or the server has no key.', 'error', 5000)
     return
   }
-  speaking.value = true
   try {
     const result = await api.speak({
       text: trimmed.slice(0, 1200),
@@ -221,18 +219,26 @@ async function play(text: string): Promise<void> {
     if (result.playError) toast(`Playback on this machine: ${result.playError}`, 'error', 6000)
   } catch (error) {
     toast(error instanceof Error ? error.message : 'Speech failed', 'error', 6000)
-  } finally {
-    speaking.value = false
   }
 }
 
-/** The P key toggles: a second press stops the speech. */
-async function speak(text: string): Promise<void> {
-  if (speaking.value) {
-    await stopSpeaking()
-    return
+/**
+ * Alt+S toggles: while a clip is still playing the chord is a stop button,
+ * otherwise it says the session's word. The playback is owned by the main
+ * process, so its answer — not a renderer flag — is what decides, and a clip
+ * that outlives the look-up still stops on the second press.
+ *
+ * Clicking a bold word is not a toggle: the user pointed at a word and wants to
+ * hear that word, which cuts off whatever was playing.
+ */
+async function toggleSpeech(): Promise<void> {
+  try {
+    const { stopped } = await api.stopSpeech()
+    if (stopped) return
+  } catch {
+    /* nothing was playing, or nothing could be stopped — say the word anyway */
   }
-  await play(text)
+  await play(term.value || headwordOfLastAnswer())
 }
 
 /**
@@ -252,7 +258,6 @@ async function stopSpeaking(): Promise<void> {
   } catch {
     /* nothing to stop */
   }
-  speaking.value = false
 }
 
 async function flipDirection(): Promise<void> {
@@ -300,7 +305,6 @@ function scrollToEnd(): void {
 }
 
 function onKey(event: KeyboardEvent): void {
-  const typing = (event.target as HTMLElement | null)?.tagName === 'TEXTAREA'
   if (event.key === 'Escape') {
     event.preventDefault()
     if (busy.value) abort()
@@ -315,12 +319,12 @@ function onKey(event: KeyboardEvent): void {
     focusComposer()
     return
   }
-  const modifier = event.altKey || event.ctrlKey || event.metaKey
-  if (event.key.toLowerCase() === 'p' && (modifier || !typing)) {
+  if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    // Both spellings say the session's word: the words being translated are the
-    // ones worth hearing, and every bold word is clickable on its own.
-    void speak(term.value || headwordOfLastAnswer())
+    // Alt+S says the session's word from anywhere in the overlay, composer
+    // included: the words being translated are the ones worth hearing, and
+    // every bold word is clickable on its own. A second press stops the clip.
+    void toggleSpeech()
     return
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -420,7 +424,7 @@ onBeforeUnmount(() => {
         :sessions="sessions"
         @send="send"
         @stop="abort"
-        @speak="speak"
+        @speak="play"
         @open="openSession"
       />
 
@@ -428,7 +432,7 @@ onBeforeUnmount(() => {
         <span><kbd>↵</kbd> new</span>
         <span><kbd>Ctrl</kbd>+<kbd>↵</kbd> follow-up</span>
         <span><kbd>Alt</kbd>+<kbd>↵</kbd> line break</span>
-        <span><kbd>P</kbd> say</span>
+        <span><kbd>Alt</kbd>+<kbd>S</kbd> say</span>
         <span v-if="status"><kbd>{{ status.hotkey }}</kbd> toggle</span>
         <span class="foot__grow" />
         <span v-if="status?.tts.available" class="foot__model">{{ status.model }}</span>

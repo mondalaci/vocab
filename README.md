@@ -82,7 +82,7 @@ pm2 logs vocab         # shows the hotkey it grabbed, and any load failure
 | `Ctrl`+`Enter` / `Shift`+`Enter` | follow-up in the conversation on screen |
 | `Alt`+`Enter` | newline in the composer |
 | `Alt`+`C` | focus the composer from anywhere in the overlay |
-| `P` | say the session's word out loud |
+| `Alt`+`S` | say the session's word out loud — press again to stop |
 | `Ctrl+K` | session list |
 | `Ctrl+N` | new session |
 | `Esc` | stop a running look-up, else leave a panel, else hide |

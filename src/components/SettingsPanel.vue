@@ -61,7 +61,7 @@ function quit(): void {
         </SelectPortal>
       </SelectRoot>
       <p class="hint">
-        <kbd>P</kbd> says the session's word · click any bold word to hear just that word.
+        <kbd>Alt</kbd>+<kbd>S</kbd> says the session's word · click any bold word to hear just that word.
       </p>
     </div>
 
