@@ -60,7 +60,7 @@ function remove(id: string): void {
             <button class="row__main" @click="emit('open', entry.id)">
               <span class="row__term">{{ entry.term || entry.title }}</span>
               <span class="row__meta">
-                <span class="row__dir">{{ entry.direction === 'en-hu' ? 'EN→HU' : 'HU→EN' }}</span>
+                <span class="row__dir">{{ entry.direction === 'en-hu' ? 'EN↔HU' : 'HU↔EN' }}</span>
                 <span>{{ entry.turns }} {{ entry.turns === 1 ? 'turn' : 'turns' }}</span>
                 <span>{{ ago(entry.updatedAt) }}</span>
               </span>

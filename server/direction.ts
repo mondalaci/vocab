@@ -1,9 +1,10 @@
 /**
  * Which way round is this message? Hungarian has enough fingerprints — its
  * digraphs, its diacritics and a handful of very common words — that a cheap
- * score beats spending a model call on the question. Low-confidence answers
- * still default to English, and the overlay shows a direction pill the user can
- * flip in one click, so a wrong guess is never more than a tap away.
+ * score beats spending a model call on the question. Text with no fingerprint
+ * at all falls back to the left side of the pair — the language the user put
+ * first — and the overlay shows a direction pill they can flip in one click,
+ * so a wrong guess is never more than a tap away.
  */
 
 import type { Direction } from '../shared/protocol.js'
@@ -104,27 +105,37 @@ export function guessDirection(text: string, fallback: Direction = 'en-hu'): Gue
     }
   }
 
-  // A phrase with no Hungarian marks at all is almost certainly English.
+  // A phrase with no Hungarian marks at all is almost certainly English, but
+  // when the left side of the pair is Hungarian the user's chosen side wins: a
+  // message that could be either language belongs to the side they put first.
   if (!HUNGARIAN_DIACRITICS.test(trimmed) && !HUNGARIAN_ONLY.test(trimmed) && !stopwords.length) {
-    if (tokens.length >= 3) {
+    if (tokens.length >= 3 && fallback === 'en-hu') {
       return { direction: 'en-hu', confidence: 'high', reason: 'plain english phrase' }
     }
   }
 
   if (score >= 3) return { direction: 'hu-en', confidence: score >= 4 ? 'high' : 'low', reason: reasons.join(' ') }
-  return { direction: 'en-hu', confidence: score === 0 ? 'high' : 'low', reason: reasons.join(' ') || 'ascii' }
+  if (score === 0) {
+    // Nothing in the text points either way, so the left side decides.
+    return {
+      direction: fallback,
+      confidence: fallback === 'en-hu' ? 'high' : 'low',
+      reason: fallback === 'en-hu' ? 'ascii' : 'left side',
+    }
+  }
+  return { direction: 'en-hu', confidence: 'low', reason: reasons.join(' ') }
 }
 
 export function otherDirection(direction: Direction): Direction {
   return direction === 'en-hu' ? 'hu-en' : 'en-hu'
 }
 
-/** 'en-hu' with the configured names, for labels like "English → magyar". */
+/** 'en-hu' with the configured names, for labels like "English ↔ magyar". */
 export function describeDirection(
   direction: Direction,
   sides: { source: { native: string }; target: { native: string } },
 ): string {
   return direction === 'en-hu'
-    ? `${sides.source.native} → ${sides.target.native}`
-    : `${sides.target.native} → ${sides.source.native}`
+    ? `${sides.source.native} ↔ ${sides.target.native}`
+    : `${sides.target.native} ↔ ${sides.source.native}`
 }

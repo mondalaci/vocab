@@ -32,12 +32,20 @@ let key = 0
 
 const overlay = window.overlay
 
-const directionLabel = computed(() => {
+/**
+ * The pair reads source-first with a two-headed arrow: translation goes both
+ * ways, so the arrow cannot carry the direction, but the order can. Whichever
+ * language is on the left is the one a look-up starts from — which is also the
+ * rule the detector follows, since a word that exists in both languages is
+ * read as the left one.
+ */
+const languagePair = computed(() => {
   const languages = status.value?.languages
-  if (!languages) return direction.value === 'en-hu' ? 'EN → HU' : 'HU → EN'
-  const english = languages.source.native
-  const hungarian = languages.target.native
-  return direction.value === 'en-hu' ? `${english} → ${hungarian}` : `${hungarian} → ${english}`
+  const english = languages?.source.native ?? 'English'
+  const hungarian = languages?.target.native ?? 'magyar'
+  return direction.value === 'en-hu'
+    ? { source: english, target: hungarian }
+    : { source: hungarian, target: english }
 })
 
 async function loadSessions(query = ''): Promise<void> {
@@ -326,8 +334,14 @@ onBeforeUnmount(() => {
       <header class="head">
         <div class="head__left">
           <strong class="head__title"><span class="head__v">v</span>ocab</strong>
-          <button class="pill" :title="`Translate the other way round`" @click="flipDirection">
-            {{ directionLabel }}
+          <button
+            class="pill pill--dir"
+            :title="`Translate the other way round (${languagePair.source} is the source language)`"
+            @click="flipDirection"
+          >
+            <span class="pill__side pill__side--source">{{ languagePair.source }}</span>
+            <span class="pill__arrow" aria-hidden="true">↔</span>
+            <span class="pill__side pill__side--target">{{ languagePair.target }}</span>
           </button>
           <span v-if="term" class="head__term">{{ term }}</span>
         </div>
@@ -464,6 +478,21 @@ onBeforeUnmount(() => {
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The pill is the direction control, and the only thing in it that says which
+   way round the thread runs is the side that is lit: the source language is
+   bright, the target recedes. */
+.pill__side--source {
+  color: var(--fg);
+}
+
+.pill:hover .pill__side--source {
+  color: var(--fg-strong);
+}
+
+.pill__arrow {
+  color: var(--dimmer);
 }
 
 /* An indeterminate bar under the header: the look-up is running, and the answer
